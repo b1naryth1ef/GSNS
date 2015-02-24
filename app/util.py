@@ -4,6 +4,10 @@ STATUS_PLAYER_RE = re.compile(r'''^#\s*(?P<cid>\d+) (?:\d+) "(?P<name>.+)" (?P<g
 
 MAPS_LIST_RE = re.compile(r"^PENDING:\s+\(fs\)\s+(?P<map_name>.+)\.bsp$")
 
+CVAR_LIST_RE = re.compile(r"(?P<cvar_name>.+)\s+\:(?P<type>.+)\s+\:\s+:(?P<description>.+)")
+
+CVAR_ENTRY_RE = re.compile(r'"(?P<name>.+)" = "(?P<value>.+)"')
+
 class RconParser(object):
     def player_match_to_dict(self, match):
         return {
@@ -54,9 +58,32 @@ class RconParser(object):
     def parse_maps(self, data):
         maps = []
 
-        for line in data:
+        for line in data.split("\n"):
             m = re.match(MAPS_LIST_RE, line)
-            maps.append(m.group("map_name"))
+            if m:
+                maps.append(m.group("map_name"))
 
         return maps
+
+    def parse_cvar(self, data):
+        m = re.match(CVAR_ENTRY_RE, data)
+
+        if not m:
+            return None
+
+        return m.group('name'), m.group('value')
+
+    def parse_cvars(self, data):
+        cvars = []
+
+        for line in data.split("\n"):
+            m = re.match(CVAR_LIST_RE, line)
+            if m:
+                cvars.append({
+                    "name": m.group("cvar_name").strip(),
+                    "type": m.group("type").strip(),
+                    "desc": m.group("description").strip(),
+                })
+
+        return cvars
 

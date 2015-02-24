@@ -7,15 +7,17 @@ app = Flask(__name__)
 app.config.from_pyfile("settings.py")
 parser = RconParser()
 
-@contextmanager
-def rcon():
-    rcon = SourceRcon(
+
+def get_rcon():
+    return SourceRcon(
             app.config.get("RCON_HOST"),
             app.config.get("RCON_PORT", 27015),
             app.config.get("RCON_PASSWORD"))
 
+@contextmanager
+def rcon():
+    rcon = get_rcon()
     yield rcon
-
     rcon.disconnect()
 
 @app.before_request
@@ -36,8 +38,8 @@ def route_server_stats():
         data = r.rcon("stats")
         return jsonify(parser.parse_stats(data))
 
-@app.route("/api/server/map")
-def route_server_map():
+@app.route("/api/map/change")
+def route_map_change():
     next_map = request.values.get("map")
 
     with rcon() as r:
@@ -48,5 +50,38 @@ def route_server_map():
 
         r.rcon("map %s" % next_map)
 
+@app.route("/api/map/list")
+def route_map_list():
+    with rcon() as r:
+        maps = parser.parse_maps(r.rcon("maps *"))
+
+        return jsonify({
+            "maps": maps
+        })
+
+@app.route("/api/cvar/list")
+def route_cvar_list():
+    with rcon() as r:
+        cvars = parser.parse_cvars(r.rcon("cvarlist"))
+
+        return jsonify({
+            "cvars": cvars
+        })
+
+@app.route("/api/cvar/get")
+def route_cvar_get():
+    with rcon() as r:
+        return jsonify({
+            "value": parser.parse_cvar(r.rcon(request.values.get("name")))[1]
+        })
+
+@app.route("/api/cvar/set")
+def route_cvar_set():
+    with rcon() as r:
+        r.rcon("%s %s" % (request.values.get('name'), request.values.get('value')))
+
+        return jsonify({})
+
 if __name__ == "__main__":
     app.run(debug=True)
+
